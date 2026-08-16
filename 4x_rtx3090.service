@@ -1,0 +1,21 @@
+[Unit]
+Description=Qwen3.8-27B LLM Server BF16 (4x RTX 3090)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=michel
+Group=michel
+WorkingDirectory=/home/michel/code/4x_RTX3090_qwen3.8-27b
+EnvironmentFile=/etc/4x_rtx3090.env
+ExecStart=/home/michel/code/4x_RTX3090_qwen3.8-27b/daemon.sh
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+LogsDirectory=4x_rtx3090
+PIDFile=/run/4x_rtx3090.pid
+
+[Install]
+WantedBy=multi-user.target

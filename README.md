@@ -1,0 +1,183 @@
+# Qwen3.8-27B on 4x RTX 3090
+
+Single-purpose LLM server. One model, one hardware configuration, zero bloat.
+
+- **Model:** Qwen3.8-27B (BF16)
+- **Hardware:** 4x NVIDIA RTX 3090 (24 GB each)
+- **Tensor parallel:** 4 (all GPUs)
+- **Context:** 262,144 tokens (FP8 KV cache)
+- **Engine:** vLLM with FlashInfer
+- **API:** OpenAI-compatible (`/v1/chat/completions`, `/v1/completions`, etc.)
+- **OS:** Ubuntu 24.04 Linux only (not Windows, WSL, or macOS)
+
+### Requirements
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| NVIDIA driver | >= 535 (tested with 595.71.05) | Provides CUDA runtime libraries |
+| CUDA toolkit (nvcc) | 12.0+ (installed by `install.sh`) | JIT compilation for Triton/FlashInfer kernels |
+| ninja-build | any (installed by `install.sh`) | Build system for FlashInfer |
+| Python | 3.12+ | Virtual environment created automatically |
+| Disk | ~55 GB | BF16 model weights + venv + cache |
+| RAM | 32 GB recommended | Model loading uses shared memory |
+
+> **How CUDA works here:** The NVIDIA driver ships CUDA runtime libraries
+> (`/usr/local/cuda-12.8/` with driver 595.x). vLLM links against these at
+> startup. The `nvidia-cuda-toolkit` package provides `nvcc` for JIT-compiling
+> Triton and FlashInfer kernels. Both the runtime (from driver) and compiler
+> (from toolkit) must be >= 12.0.
+
+## Install as systemd service (recommended)
+
+```bash
+sudo bash install.sh
+```
+
+Options:
+
+```bash
+sudo bash install.sh --model /path/to/model --port 9000
+sudo bash install.sh --hf-repo Qwen/Qwen3.8-27B    # custom HF repo
+sudo bash install.sh --skip-download                    # model already on disk
+sudo bash install.sh --dry-run                          # preview without installing
+```
+
+Hugging Face token (required for download):
+
+```bash
+# Option 1: set before running
+export HF_TOKEN=hf_...
+sudo -E bash install.sh
+
+# Option 2: the installer will prompt you interactively
+sudo bash install.sh
+```
+
+Manage the service:
+
+```bash
+systemctl status 4x_rtx3090            # check status
+journalctl -u 4x_rtx3090 -f           # follow logs
+systemctl restart 4x_rtx3090           # restart
+sudo bash uninstall.sh                  # remove service
+```
+
+## Manual run
+
+```bash
+# Start (with startup benchmark)
+bash serve.sh
+
+# Stop
+bash kill-vllm.sh
+
+# Test
+bash test.sh
+
+# Check GPUs
+bash gpu-status.sh
+
+# Clean logs
+bash clean-logs.sh
+
+# Pre-flight check only (don't start)
+VLLM_CHECK_ONLY=1 bash serve.sh
+```
+
+## Configuration
+
+All settings are environment variables. See `.env.example` for the full list.
+
+| Variable       | Default   | Description                        |
+|--------------- |-----------|------------------------------------|
+| `VLLM_PORT`    | 8000      | HTTP port                          |
+| `VLLM_TP`      | 4         | Tensor parallel size (GPUs)        |
+| `VLLM_GPU_MEM` | 0.90      | GPU memory utilization fraction    |
+| `VLLM_MAX_LEN` | 262144    | Max context length (tokens)        |
+| `VLLM_MAX_SEQS`| 2         | Max concurrent sequences           |
+
+Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
+
+## API
+
+OpenAI-compatible endpoints:
+
+- `GET /health` — health check
+- `GET /v1/models` — list models
+- `POST /v1/chat/completions` — chat
+- `POST /v1/completions` — completions
+- `POST /v1/embeddings` — embeddings (if supported)
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3.8-27B",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 100
+  }'
+```
+
+## Features
+
+- **BF16 precision** — full-precision weights on 96 GB VRAM
+- **FP8 KV cache** — extended context with reduced memory
+- **Multi-token prediction** — 3 speculative tokens via MTP
+- **Prefix caching** — fast repeated prefixes (e.g. system prompts)
+- **Qwen3 reasoning parser** — structured reasoning output
+- **Qwen3 coder tool parser** — function calling support
+
+## Benchmark
+
+Measured on 4x NVIDIA RTX 3090 (24 GB each), vLLM 0.23.0, Qwen3.8-27B BF16.
+
+| Metric | Result |
+|--------|--------|
+| TTFT (Time To First Token) | ~5 ms |
+| Generation speed (100 tokens) | 74.6 tok/s |
+| Generation speed (500 tokens) | 74.0 tok/s |
+| Generation speed (1000 tokens) | 74.7 tok/s |
+| GPU memory per GPU | ~21.9 GB / 24.6 GB |
+
+Tested with streaming chat completions, temperature=0, default system prompt.
+Speed is consistent across response lengths due to FP8 KV cache and multi-token prediction.
+
+## Files
+
+| File                    | Purpose                                      |
+|-------------------------|----------------------------------------------|
+| `install.sh`            | Install as systemd service (+ download)      |
+| `uninstall.sh`          | Remove systemd service                       |
+| `download_model.py`     | Download model from Hugging Face             |
+| `daemon.sh`             | Systemd entry point (no interactive UI)      |
+| `serve.sh`              | Manual start with benchmark                  |
+| `test.sh`               | Quick smoke test (5 checks)                  |
+| `kill-vllm.sh`          | Stop the server                              |
+| `gpu-status.sh`         | GPU health and memory usage                  |
+| `set_gpus_limits.sh`    | Set GPU power limits (225W)                  |
+| `clean-logs.sh`         | Clean up log files                           |
+| `multi-instance.sh`     | Show GPU + instance status                   |
+| `restart.sh`            | Restart the systemd service                  |
+| `.env.example`          | Configuration reference                      |
+
+## Logging
+
+- **Systemd:** `journalctl -u 4x_rtx3090 -f`
+- **Manual:** `/tmp/vllm-serve.log`
+- **PID file:** `/tmp/vllm-<PORT>.pid`
+
+## GPU power limits
+
+To reduce power consumption (optional):
+
+```bash
+sudo bash set_gpus_limits.sh    # sets all 4 GPUs to 225W
+```
+
+> Power limits reset to defaults after reboot. Run again or add to a startup script.
+
+## Design philosophy
+
+Most LLM serving tools try to be universal — support every model on every hardware. This results in complex configs, hidden defaults, and fragile setups.
+
+This repo does one thing: serve a 27B Qwen model in BF16 on 4x RTX 3090s with 262K context. Every parameter is tuned for this specific combination. If you have different hardware, fork and adjust.
