@@ -100,7 +100,9 @@ for raw_line in env_path.read_text().splitlines():
     if not line or line.startswith("#") or "=" not in raw_line:
         continue
 
-    current_key, raw_value = raw_line.split("=", 1)
+    current_key, raw_value = line.split("=", 1)
+    current_key = current_key.strip()
+    raw_value = raw_value.strip()
     if current_key != key:
         continue
 
