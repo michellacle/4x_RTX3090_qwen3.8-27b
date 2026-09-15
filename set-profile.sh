@@ -20,10 +20,10 @@ cleanup() {
   rm -f "$TMP_ENV" "$TMP_PROFILE"
 
   if [ "$RESTORE_ON_EXIT" -eq 1 ]; then
-    [ -n "$BACKUP_ENV" ] && cp "$BACKUP_ENV" "$ENV_PATH"
+    [ -n "$BACKUP_ENV" ] && mv -f "$BACKUP_ENV" "$ENV_PATH"
 
     if [ -n "$BACKUP_PROFILE" ] && [ -f "$BACKUP_PROFILE" ]; then
-      cp "$BACKUP_PROFILE" "$CURRENT_PROFILE_PATH"
+      mv -f "$BACKUP_PROFILE" "$CURRENT_PROFILE_PATH"
     else
       rm -f "$CURRENT_PROFILE_PATH"
     fi

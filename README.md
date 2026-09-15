@@ -34,8 +34,8 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 sudo bash install.sh
 ```
 
-When stdin is interactive, the installer shows the available runtime profiles and lets you pick one.
-If the installer is non-interactive, it uses the safe `default` profile automatically, or you can pass `--profile <name>` explicitly.
+By default the installer uses the safe `default` profile.
+To install a different preset deterministically, pass `--profile <name>` explicitly.
 
 Options:
 
@@ -125,7 +125,7 @@ Profiles live in `profiles/*.env` in the repo so the team can share working pres
 | `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets |
 | `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled |
 
-`set-profile.sh` stops the systemd service, rewrites `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and starts the service again.
+`set-profile.sh` stops the systemd service, atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and starts the service again.
 
 ## API
 

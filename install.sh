@@ -62,17 +62,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -z "$PROFILE_NAME" ]; then
-  if [ -t 0 ] && [ -t 1 ]; then
-    echo "Available runtime profiles:"
-    list_profiles
-    echo ""
-    read -rp "Runtime profile [${DEFAULT_PROFILE_NAME}]: " PROFILE_NAME
-    PROFILE_NAME="${PROFILE_NAME:-$DEFAULT_PROFILE_NAME}"
-  else
-    PROFILE_NAME="$DEFAULT_PROFILE_NAME"
-  fi
-fi
+PROFILE_NAME="${PROFILE_NAME:-$DEFAULT_PROFILE_NAME}"
 
 load_profile "$PROFILE_NAME"
 
