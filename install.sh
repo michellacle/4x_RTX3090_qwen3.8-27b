@@ -41,7 +41,7 @@ PROFILE_NAME=""
 
 require_option_arg() {
   local option_name="$1"
-  if [ $# -lt 2 ] || [ -z "${2:-}" ] || [[ "${2:-}" == -* ]]; then
+  if [ $# -lt 3 ] || [ -z "${3:-}" ] || [[ "${3:-}" == -* ]]; then
     echo "ERROR: ${option_name} requires a value." >&2
     exit 1
   fi
@@ -50,12 +50,12 @@ require_option_arg() {
 # ---- parse args ---------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)         require_option_arg "$@"; MODEL_PATH="$2"; shift 2 ;;
-    --hf-repo)       require_option_arg "$@"; HF_REPO="$2";     shift 2 ;;
-    --port)          require_option_arg "$@"; BASE_PORT="$2";   shift 2 ;;
-    --profile)       require_option_arg "$@"; PROFILE_NAME="$2"; shift 2 ;;
+    --model)         require_option_arg "--model" "$@"; MODEL_PATH="$2"; shift 2 ;;
+    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2";     shift 2 ;;
+    --port)          require_option_arg "--port" "$@"; BASE_PORT="$2";   shift 2 ;;
+    --profile)       require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
-    --user)          require_option_arg "$@"; RUN_USER="$2";    shift 2 ;;
+    --user)          require_option_arg "--user" "$@"; RUN_USER="$2";    shift 2 ;;
     --skip-download) SKIP_DOWNLOAD=1;  shift ;;
     --dry-run)       DRY_RUN=1;        shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;

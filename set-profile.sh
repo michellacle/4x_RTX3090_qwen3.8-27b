@@ -15,8 +15,10 @@ BACKUP_ENV=""
 BACKUP_PROFILE=""
 RESTORE_ON_EXIT=0
 SERVICE_STOPPED=0
+ROLLBACK_FAILED=0
 
 cleanup() {
+  local exit_status="${1:-0}"
   rm -f "$TMP_ENV" "$TMP_PROFILE"
 
   if [ "$RESTORE_ON_EXIT" -eq 1 ]; then
@@ -32,14 +34,22 @@ cleanup() {
       systemctl reset-failed "${BASE_NAME}.service" >/dev/null 2>&1 || true
       if ! systemctl start "${BASE_NAME}.service" >/dev/null 2>&1; then
         echo "ERROR: Failed to restore ${BASE_NAME}.service with the previous profile." >&2
+        ROLLBACK_FAILED=1
       fi
     fi
   fi
 
   rm -f "$BACKUP_ENV" "$BACKUP_PROFILE"
+
+  if [ "$ROLLBACK_FAILED" -eq 1 ]; then
+    exit_status=1
+  fi
+
+  trap - EXIT
+  exit "$exit_status"
 }
 
-trap cleanup EXIT
+trap 'cleanup $?' EXIT
 
 usage() {
   cat <<EOF
