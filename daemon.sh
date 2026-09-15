@@ -24,22 +24,37 @@ if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPECULATIVE_TOKENS="${VLLM_SPECULATIVE_TOKENS:-3}"
 
-exec "${SCRIPT_DIR}/.venv/bin/vllm" serve \
-  "${MODEL_PATH}" \
-  --host "${VLLM_HOST:-0.0.0.0}" \
-  --port "${VLLM_PORT:-8000}" \
-  --tensor-parallel-size "${VLLM_TP:-4}" \
-  --gpu-memory-utilization "${VLLM_GPU_MEM:-0.90}" \
-  --max-model-len "${VLLM_MAX_LEN:-262144}" \
-  --max-num-seqs "${VLLM_MAX_SEQS:-2}" \
-  --kv-cache-dtype fp8 \
-  --block-size 16 \
-  --disable-custom-all-reduce \
-  --enable-auto-tool-choice \
-  --tool-call-parser qwen3_coder \
-  --served-model-name Qwen/Qwen3.8-27B \
-  --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
-  --enable-prefix-caching \
-  --reasoning-parser qwen3 \
+if ! [[ "$SPECULATIVE_TOKENS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: VLLM_SPECULATIVE_TOKENS must be a non-negative integer. Got: ${SPECULATIVE_TOKENS}" >&2
+  exit 1
+fi
+
+VLLM_ARGS=(
+  "${MODEL_PATH}"
+  --host "${VLLM_HOST:-0.0.0.0}"
+  --port "${VLLM_PORT:-8000}"
+  --tensor-parallel-size "${VLLM_TP:-4}"
+  --gpu-memory-utilization "${VLLM_GPU_MEM:-0.90}"
+  --max-model-len "${VLLM_MAX_LEN:-262144}"
+  --max-num-seqs "${VLLM_MAX_SEQS:-2}"
+  --kv-cache-dtype fp8
+  --block-size 16
+  --disable-custom-all-reduce
+  --enable-auto-tool-choice
+  --tool-call-parser qwen3_coder
+  --served-model-name Qwen/Qwen3.8-27B
+  --reasoning-parser qwen3
   --disable-log-stats
+)
+
+if [ "$SPECULATIVE_TOKENS" -gt 0 ]; then
+  VLLM_ARGS+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${SPECULATIVE_TOKENS}}")
+fi
+
+if [ "${VLLM_ENABLE_PREFIX_CACHING:-1}" = "1" ]; then
+  VLLM_ARGS+=(--enable-prefix-caching)
+fi
+
+exec "${SCRIPT_DIR}/.venv/bin/vllm" serve "${VLLM_ARGS[@]}"

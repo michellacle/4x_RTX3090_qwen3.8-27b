@@ -12,6 +12,8 @@
 #   --model PATH       Model directory (default: ~/models/qwen3.8-27b-bf16)
 #   --hf-repo REPO     Hugging Face repo (default: Qwen/Qwen3.8-27B)
 #   --port NUM         HTTP port (default: 8000)
+#   --profile NAME     Runtime profile (default: prompt or safe default)
+#   --list-profiles    Show available runtime profiles and exit
 #   --user NAME        System user to run as (default: current user)
 #   --skip-download    Skip model download (must already exist)
 #   --dry-run          Show what would be done without making changes
@@ -22,29 +24,47 @@
 # ===================================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/profile-lib.sh"
+
 # ---- defaults -----------------------------------------------------
 BASE_PORT=8000
 HF_REPO="Qwen/Qwen3.8-27B"
 RUN_USER=""
 DRY_RUN=0
 SKIP_DOWNLOAD=0
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_NAME="4x_rtx3090"
 GPUS_PER_INSTANCE=4
 VENV_DIR="${SCRIPT_DIR}/.venv"
+PROFILE_NAME=""
+
+require_option_arg() {
+  local option_name="$1"
+  if [ $# -lt 3 ] || [ -z "${3:-}" ] || [[ "${3:-}" == -* ]]; then
+    echo "ERROR: ${option_name} requires a value." >&2
+    exit 1
+  fi
+}
 
 # ---- parse args ---------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)         MODEL_PATH="$2"; shift 2 ;;
-    --hf-repo)       HF_REPO="$2";     shift 2 ;;
-    --port)          BASE_PORT="$2";   shift 2 ;;
-    --user)          RUN_USER="$2";    shift 2 ;;
+    --model)         require_option_arg "--model" "$@"; MODEL_PATH="$2"; shift 2 ;;
+    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2";     shift 2 ;;
+    --port)          require_option_arg "--port" "$@"; BASE_PORT="$2";   shift 2 ;;
+    --profile)       require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
+    --list-profiles) list_profiles; exit 0 ;;
+    --user)          require_option_arg "--user" "$@"; RUN_USER="$2";    shift 2 ;;
     --skip-download) SKIP_DOWNLOAD=1;  shift ;;
     --dry-run)       DRY_RUN=1;        shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+PROFILE_NAME="${PROFILE_NAME:-$DEFAULT_PROFILE_NAME}"
+
+load_profile "$PROFILE_NAME"
 
 # ---- determine user -----------------------------------------------
 if [ -z "$RUN_USER" ]; then
@@ -89,13 +109,15 @@ GPUS="0,1,2,3"
 PORT=$BASE_PORT
 UNIT_PATH="/etc/systemd/system/${BASE_NAME}.service"
 ENV_PATH="/etc/${BASE_NAME}.env"
+CURRENT_PROFILE_PATH="/etc/${BASE_NAME}.profile"
 
 echo "=== Install Plan ==="
 echo "  Service: ${BASE_NAME}.service"
+echo "  Profile: ${PROFILE_NAME} (${PROFILE_SUMMARY})"
 echo "  GPUs:    $GPUS"
 echo "  Port:    $PORT"
 echo "  TP:      $GPUS_PER_INSTANCE"
-echo "  Context: 262144 tokens (FP8 KV cache)"
+echo "  Context: ${PROFILE_VLLM_MAX_LEN} tokens"
 echo ""
 
 # ---- install CUDA toolkit -----------------------------------------
@@ -199,27 +221,26 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
-# Create log directory
-mkdir -p "/var/log/${BASE_NAME}"
-chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
+if [ "$DRY_RUN" -eq 0 ]; then
+  # Create log directory
+  mkdir -p "/var/log/${BASE_NAME}"
+  chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
 
-# Write environment file
-echo ""
-echo "Writing $ENV_PATH ..."
-cat > "$ENV_PATH" <<EOF
-MODEL_PATH=${MODEL_PATH}
-VLLM_PORT=${PORT}
-VLLM_TP=${GPUS_PER_INSTANCE}
-VLLM_GPU_MEM=0.90
-VLLM_MAX_LEN=262144
-VLLM_MAX_SEQS=2
-CUDA_VISIBLE_DEVICES=${GPUS}
-EOF
-chmod 640 "$ENV_PATH"
+  # Write environment file
+  echo ""
+  echo "Writing $ENV_PATH ..."
+  TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
+  TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
+  write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
+  chmod 640 "$TMP_ENV"
+  printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
+  chmod 644 "$TMP_PROFILE"
+  mv "$TMP_ENV" "$ENV_PATH"
+  mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
 
-# Write systemd unit
-echo "Writing $UNIT_PATH ..."
-cat > "$UNIT_PATH" <<EOF
+  # Write systemd unit
+  echo "Writing $UNIT_PATH ..."
+  cat > "$UNIT_PATH" <<EOF
 [Unit]
 Description=Qwen3.8-27B LLM Server (4x RTX 3090)
 After=network-online.target
@@ -243,55 +264,59 @@ PIDFile=/run/${BASE_NAME}.pid
 WantedBy=multi-user.target
 EOF
 
-# ---- reload, enable, start ----------------------------------------
-echo ""
-echo "Reloading systemd ..."
-systemctl daemon-reload
+  # ---- reload, enable, start ----------------------------------------
+  echo ""
+  echo "Reloading systemd ..."
+  systemctl daemon-reload
 
-echo "Enabling ${BASE_NAME}.service ..."
-systemctl enable "${BASE_NAME}.service"
+  echo "Enabling ${BASE_NAME}.service ..."
+  systemctl enable "${BASE_NAME}.service"
 
-echo ""
-echo "Starting ${BASE_NAME} ..."
-systemctl start "${BASE_NAME}.service"
+  echo ""
+  echo "Starting ${BASE_NAME} ..."
+  systemctl start "${BASE_NAME}.service"
 
-# ---- verify -------------------------------------------------------
-echo ""
-echo "Waiting for server to start (model loading takes 1-2 minutes) ..."
+  # ---- verify -------------------------------------------------------
+  echo ""
+  echo "Waiting for server to start (model loading takes 1-2 minutes) ..."
 
-for attempt in $(seq 1 180); do
-  if curl -sf "http://127.0.0.1:${PORT}/health" &>/dev/null; then
-    echo ""
-    echo "=== Server is healthy on http://0.0.0.0:${PORT} ==="
-    echo ""
-    echo "  systemd:  systemctl status ${BASE_NAME}"
-    echo "  logs:     journalctl -u ${BASE_NAME} -f"
-    echo "  restart:  sudo bash ${SCRIPT_DIR}/restart.sh"
-    echo "  test:     bash ${SCRIPT_DIR}/test.sh"
-    echo "  stop:     sudo bash ${SCRIPT_DIR}/uninstall.sh"
-    echo ""
+  for attempt in $(seq 1 180); do
+    if curl -sf "http://127.0.0.1:${PORT}/health" &>/dev/null; then
+      echo ""
+      echo "=== Server is healthy on http://0.0.0.0:${PORT} ==="
+      echo ""
+      echo "  systemd:  systemctl status ${BASE_NAME}"
+      echo "  logs:     journalctl -u ${BASE_NAME} -f"
+      echo "  restart:  sudo bash ${SCRIPT_DIR}/restart.sh"
+      echo "  profile:  sudo bash ${SCRIPT_DIR}/set-profile.sh <name>"
+      echo "  test:     bash ${SCRIPT_DIR}/test.sh"
+      echo "  stop:     sudo bash ${SCRIPT_DIR}/uninstall.sh"
+      echo ""
 
-    # Show vRAM usage
-    echo "  vRAM:"
-    nvidia-smi --query-gpu=index,memory.used,memory.total \
-      --format=csv,noheader,nounits 2>/dev/null | \
-      while IFS=',' read -r idx used total; do
-        echo "    GPU${idx}: ${used} / ${total} GB"
-      done
-    exit 0
-  fi
+      # Show vRAM usage
+      echo "  vRAM:"
+      nvidia-smi --query-gpu=index,memory.used,memory.total \
+        --format=csv,noheader,nounits 2>/dev/null | \
+        while IFS=',' read -r idx used total; do
+          echo "    GPU${idx}: ${used} / ${total} GB"
+        done
+      exit 0
+    fi
 
-  if systemctl is-failed "${BASE_NAME}" &>/dev/null; then
-    echo ""
-    echo "ERROR: Service failed to start."
-    echo "Check logs: journalctl -u ${BASE_NAME} -f"
-    exit 1
-  fi
+    if systemctl is-failed "${BASE_NAME}" &>/dev/null; then
+      echo ""
+      echo "ERROR: Service failed to start."
+      echo "Check logs: journalctl -u ${BASE_NAME} -f"
+      exit 1
+    fi
 
-  sleep 2
-done
+    sleep 2
+  done
+fi
 
-echo ""
-echo "WARNING: Server did not become healthy within 6 minutes."
-echo "Check logs: journalctl -u ${BASE_NAME} -f"
-exit 1
+if [ "$DRY_RUN" -eq 0 ]; then
+  echo ""
+  echo "WARNING: Server did not become healthy within 6 minutes."
+  echo "Check logs: journalctl -u ${BASE_NAME} -f"
+  exit 1
+fi

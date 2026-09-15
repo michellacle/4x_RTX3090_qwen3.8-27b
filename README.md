@@ -9,6 +9,7 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 - **Engine:** vLLM with FlashInfer
 - **API:** OpenAI-compatible (`/v1/chat/completions`, `/v1/completions`, etc.)
 - **OS:** Ubuntu 24.04 Linux only (not Windows, WSL, or macOS)
+- **Runtime profiles:** Repo-stored presets you can switch without editing scripts
 
 ### Requirements
 
@@ -33,10 +34,15 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 sudo bash install.sh
 ```
 
+By default the installer uses the safe `default` profile.
+To install a different preset deterministically, pass `--profile <name>` explicitly.
+
 Options:
 
 ```bash
 sudo bash install.sh --model /path/to/model --port 9000
+sudo bash install.sh --profile low-latency
+sudo bash install.sh --list-profiles
 sudo bash install.sh --hf-repo Qwen/Qwen3.8-27B    # custom HF repo
 sudo bash install.sh --skip-download                    # model already on disk
 sudo bash install.sh --dry-run                          # preview without installing
@@ -59,6 +65,8 @@ Manage the service:
 systemctl status 4x_rtx3090            # check status
 journalctl -u 4x_rtx3090 -f           # follow logs
 systemctl restart 4x_rtx3090           # restart
+bash set-profile.sh --list             # show available runtime profiles
+sudo bash set-profile.sh quality-focused
 sudo bash uninstall.sh                  # remove service
 ```
 
@@ -67,6 +75,10 @@ sudo bash uninstall.sh                  # remove service
 ```bash
 # Start (with startup benchmark)
 bash serve.sh
+bash serve.sh --profile low-latency
+
+# List profiles
+bash serve.sh --list-profiles
 
 # Stop
 bash kill-vllm.sh
@@ -88,15 +100,32 @@ VLLM_CHECK_ONLY=1 bash serve.sh
 
 All settings are environment variables. See `.env.example` for the full list.
 
-| Variable       | Default   | Description                        |
-|--------------- |-----------|------------------------------------|
-| `VLLM_PORT`    | 8000      | HTTP port                          |
-| `VLLM_TP`      | 4         | Tensor parallel size (GPUs)        |
-| `VLLM_GPU_MEM` | 0.90      | GPU memory utilization fraction    |
-| `VLLM_MAX_LEN` | 262144    | Max context length (tokens)        |
-| `VLLM_MAX_SEQS`| 2         | Max concurrent sequences           |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `VLLM_PORT` | 8000 | HTTP port |
+| `VLLM_TP` | 4 | Tensor parallel size (GPUs) |
+| `VLLM_GPU_MEM` | 0.90 | GPU memory utilization fraction |
+| `VLLM_MAX_LEN` | 262144 | Max context length (tokens) |
+| `VLLM_MAX_SEQS` | 2 | Max concurrent sequences |
+| `VLLM_SPECULATIVE_TOKENS` | 3 | MTP speculative decoding tokens |
+| `VLLM_ENABLE_PREFIX_CACHING` | 1 | Enable prefix caching |
 
 Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
+
+## Runtime profiles
+
+Profiles live in `profiles/*.env` in the repo so the team can share working presets.
+
+| Profile | Tradeoff |
+| --- | --- |
+| `default` | Safe default using the current 262K / 2-sequence settings |
+| `low-latency` | Faster first-token and single-request response times |
+| `high-throughput` | Higher short-job throughput with reduced context |
+| `aggressive` | Fastest / lowest-quality preset for short prompts and bulk experimentation |
+| `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets |
+| `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled |
+
+`set-profile.sh` keeps the existing install-specific values (`MODEL_PATH`, `VLLM_PORT`, `VLLM_TP`, and `CUDA_VISIBLE_DEVICES`), atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and restarts the service.
 
 ## API
 
@@ -158,6 +187,9 @@ Speed is consistent across response lengths due to FP8 KV cache and multi-token 
 | `clean-logs.sh`         | Clean up log files                           |
 | `multi-instance.sh`     | Show GPU + instance status                   |
 | `restart.sh`            | Restart the systemd service                  |
+| `set-profile.sh`        | Switch to a different runtime profile        |
+| `profile-lib.sh`        | Shared runtime profile loader/writer         |
+| `profiles/*.env`        | Repo-stored runtime presets                  |
 | `.env.example`          | Configuration reference                      |
 
 ## Logging
