@@ -80,10 +80,10 @@ if [ ! -f "$ENV_PATH" ]; then
   exit 1
 fi
 
-load_profile "$PROFILE_NAME"
-
 # shellcheck disable=SC1090
 source "$ENV_PATH"
+
+load_profile "$PROFILE_NAME"
 
 TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
 TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
