@@ -221,25 +221,26 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
-# Create log directory
-mkdir -p "/var/log/${BASE_NAME}"
-chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
+if [ "$DRY_RUN" -eq 0 ]; then
+  # Create log directory
+  mkdir -p "/var/log/${BASE_NAME}"
+  chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
 
-# Write environment file
-echo ""
-echo "Writing $ENV_PATH ..."
-TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
-TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
-write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
-chmod 640 "$TMP_ENV"
-printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
-chmod 644 "$TMP_PROFILE"
-mv "$TMP_ENV" "$ENV_PATH"
-mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
+  # Write environment file
+  echo ""
+  echo "Writing $ENV_PATH ..."
+  TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
+  TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
+  write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
+  chmod 640 "$TMP_ENV"
+  printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
+  chmod 644 "$TMP_PROFILE"
+  mv "$TMP_ENV" "$ENV_PATH"
+  mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
 
-# Write systemd unit
-echo "Writing $UNIT_PATH ..."
-cat > "$UNIT_PATH" <<EOF
+  # Write systemd unit
+  echo "Writing $UNIT_PATH ..."
+  cat > "$UNIT_PATH" <<EOF
 [Unit]
 Description=Qwen3.8-27B LLM Server (4x RTX 3090)
 After=network-online.target
@@ -263,54 +264,55 @@ PIDFile=/run/${BASE_NAME}.pid
 WantedBy=multi-user.target
 EOF
 
-# ---- reload, enable, start ----------------------------------------
-echo ""
-echo "Reloading systemd ..."
-systemctl daemon-reload
+  # ---- reload, enable, start ----------------------------------------
+  echo ""
+  echo "Reloading systemd ..."
+  systemctl daemon-reload
 
-echo "Enabling ${BASE_NAME}.service ..."
-systemctl enable "${BASE_NAME}.service"
+  echo "Enabling ${BASE_NAME}.service ..."
+  systemctl enable "${BASE_NAME}.service"
 
-echo ""
-echo "Starting ${BASE_NAME} ..."
-systemctl start "${BASE_NAME}.service"
+  echo ""
+  echo "Starting ${BASE_NAME} ..."
+  systemctl start "${BASE_NAME}.service"
 
-# ---- verify -------------------------------------------------------
-echo ""
-echo "Waiting for server to start (model loading takes 1-2 minutes) ..."
+  # ---- verify -------------------------------------------------------
+  echo ""
+  echo "Waiting for server to start (model loading takes 1-2 minutes) ..."
 
-for attempt in $(seq 1 180); do
-  if curl -sf "http://127.0.0.1:${PORT}/health" &>/dev/null; then
-    echo ""
-    echo "=== Server is healthy on http://0.0.0.0:${PORT} ==="
-    echo ""
-    echo "  systemd:  systemctl status ${BASE_NAME}"
-    echo "  logs:     journalctl -u ${BASE_NAME} -f"
-    echo "  restart:  sudo bash ${SCRIPT_DIR}/restart.sh"
-    echo "  profile:  sudo bash ${SCRIPT_DIR}/set-profile.sh <name>"
-    echo "  test:     bash ${SCRIPT_DIR}/test.sh"
-    echo "  stop:     sudo bash ${SCRIPT_DIR}/uninstall.sh"
-    echo ""
+  for attempt in $(seq 1 180); do
+    if curl -sf "http://127.0.0.1:${PORT}/health" &>/dev/null; then
+      echo ""
+      echo "=== Server is healthy on http://0.0.0.0:${PORT} ==="
+      echo ""
+      echo "  systemd:  systemctl status ${BASE_NAME}"
+      echo "  logs:     journalctl -u ${BASE_NAME} -f"
+      echo "  restart:  sudo bash ${SCRIPT_DIR}/restart.sh"
+      echo "  profile:  sudo bash ${SCRIPT_DIR}/set-profile.sh <name>"
+      echo "  test:     bash ${SCRIPT_DIR}/test.sh"
+      echo "  stop:     sudo bash ${SCRIPT_DIR}/uninstall.sh"
+      echo ""
 
-    # Show vRAM usage
-    echo "  vRAM:"
-    nvidia-smi --query-gpu=index,memory.used,memory.total \
-      --format=csv,noheader,nounits 2>/dev/null | \
-      while IFS=',' read -r idx used total; do
-        echo "    GPU${idx}: ${used} / ${total} GB"
-      done
-    exit 0
-  fi
+      # Show vRAM usage
+      echo "  vRAM:"
+      nvidia-smi --query-gpu=index,memory.used,memory.total \
+        --format=csv,noheader,nounits 2>/dev/null | \
+        while IFS=',' read -r idx used total; do
+          echo "    GPU${idx}: ${used} / ${total} GB"
+        done
+      exit 0
+    fi
 
-  if systemctl is-failed "${BASE_NAME}" &>/dev/null; then
-    echo ""
-    echo "ERROR: Service failed to start."
-    echo "Check logs: journalctl -u ${BASE_NAME} -f"
-    exit 1
-  fi
+    if systemctl is-failed "${BASE_NAME}" &>/dev/null; then
+      echo ""
+      echo "ERROR: Service failed to start."
+      echo "Check logs: journalctl -u ${BASE_NAME} -f"
+      exit 1
+    fi
 
-  sleep 2
-done
+    sleep 2
+  done
+fi
 
 echo ""
 echo "WARNING: Server did not become healthy within 6 minutes."

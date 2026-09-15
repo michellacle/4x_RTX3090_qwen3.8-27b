@@ -102,9 +102,9 @@ printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
 chmod 644 "$TMP_PROFILE"
 
 RESTORE_ON_EXIT=1
+SERVICE_STOPPED=1
 echo "Stopping ${BASE_NAME}.service ..."
 systemctl stop "${BASE_NAME}.service"
-SERVICE_STOPPED=1
 
 mv "$TMP_ENV" "$ENV_PATH"
 mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
