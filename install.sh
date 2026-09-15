@@ -314,7 +314,9 @@ EOF
   done
 fi
 
-echo ""
-echo "WARNING: Server did not become healthy within 6 minutes."
-echo "Check logs: journalctl -u ${BASE_NAME} -f"
-exit 1
+if [ "$DRY_RUN" -eq 0 ]; then
+  echo ""
+  echo "WARNING: Server did not become healthy within 6 minutes."
+  echo "Check logs: journalctl -u ${BASE_NAME} -f"
+  exit 1
+fi
