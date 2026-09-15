@@ -228,12 +228,14 @@ chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
 # Write environment file
 echo ""
 echo "Writing $ENV_PATH ..."
-write_runtime_env "$ENV_PATH" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
-chmod 640 "$ENV_PATH"
-if [ "$DRY_RUN" -ne 1 ]; then
-  printf '%s\n' "$PROFILE_NAME" > "$CURRENT_PROFILE_PATH"
-  chmod 644 "$CURRENT_PROFILE_PATH"
-fi
+TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
+TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
+write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
+chmod 640 "$TMP_ENV"
+printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
+chmod 644 "$TMP_PROFILE"
+mv "$TMP_ENV" "$ENV_PATH"
+mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
 
 # Write systemd unit
 echo "Writing $UNIT_PATH ..."

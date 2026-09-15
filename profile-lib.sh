@@ -53,8 +53,11 @@ list_profiles() {
   for path in "${PROFILE_DIR}"/*.env; do
     [ -e "$path" ] || continue
     profile_name="$(basename "$path" .env)"
-    load_profile "$profile_name" >/dev/null
-    printf "  %-20s %s\n" "$profile_name" "$PROFILE_SUMMARY"
+    if load_profile "$profile_name" >/dev/null; then
+      printf "  %-20s %s\n" "$profile_name" "$PROFILE_SUMMARY"
+    else
+      printf "  %-20s %s\n" "$profile_name" "[invalid profile]" >&2
+    fi
   done
 }
 
