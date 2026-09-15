@@ -118,7 +118,7 @@ if [ "$ENABLE_PREFIX_CACHING" = "1" ]; then
   VLLM_ARGS+=(--enable-prefix-caching)
 fi
 
-nohup "$VLLM_VENV/bin/vllm" serve "${VLLM_ARGS[@]}" 2>&1 &> /tmp/vllm-serve.log &
+nohup "$VLLM_VENV/bin/vllm" serve "${VLLM_ARGS[@]}" > /tmp/vllm-serve.log 2>&1 &
 
 VLLM_PID=$!
 echo "$VLLM_PID" > "$PID_FILE"

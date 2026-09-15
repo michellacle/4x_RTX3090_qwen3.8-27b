@@ -66,16 +66,16 @@ write_runtime_env() {
   local tensor_parallel="$5"
   local gpus="$6"
 
-  cat > "$env_path" <<EOF
-MODEL_PATH=${model_path}
-VLLM_PORT=${port}
-VLLM_TP=${tensor_parallel}
-VLLM_GPU_MEM=${PROFILE_VLLM_GPU_MEM}
-VLLM_MAX_LEN=${PROFILE_VLLM_MAX_LEN}
-VLLM_MAX_SEQS=${PROFILE_VLLM_MAX_SEQS}
-VLLM_SPECULATIVE_TOKENS=${PROFILE_VLLM_SPECULATIVE_TOKENS}
-VLLM_ENABLE_PREFIX_CACHING=${PROFILE_VLLM_ENABLE_PREFIX_CACHING}
-CUDA_VISIBLE_DEVICES=${gpus}
-RUNTIME_PROFILE=${profile_name}
-EOF
+  {
+    printf 'MODEL_PATH=%q\n' "$model_path"
+    printf 'VLLM_PORT=%q\n' "$port"
+    printf 'VLLM_TP=%q\n' "$tensor_parallel"
+    printf 'VLLM_GPU_MEM=%q\n' "$PROFILE_VLLM_GPU_MEM"
+    printf 'VLLM_MAX_LEN=%q\n' "$PROFILE_VLLM_MAX_LEN"
+    printf 'VLLM_MAX_SEQS=%q\n' "$PROFILE_VLLM_MAX_SEQS"
+    printf 'VLLM_SPECULATIVE_TOKENS=%q\n' "$PROFILE_VLLM_SPECULATIVE_TOKENS"
+    printf 'VLLM_ENABLE_PREFIX_CACHING=%q\n' "$PROFILE_VLLM_ENABLE_PREFIX_CACHING"
+    printf 'CUDA_VISIBLE_DEVICES=%q\n' "$gpus"
+    printf 'RUNTIME_PROFILE=%q\n' "$profile_name"
+  } > "$env_path"
 }
