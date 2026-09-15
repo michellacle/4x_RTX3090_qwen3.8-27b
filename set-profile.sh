@@ -9,6 +9,34 @@ BASE_NAME="4x_rtx3090"
 ENV_PATH="/etc/${BASE_NAME}.env"
 CURRENT_PROFILE_PATH="/etc/${BASE_NAME}.profile"
 PROFILE_NAME=""
+TMP_ENV=""
+TMP_PROFILE=""
+BACKUP_ENV=""
+BACKUP_PROFILE=""
+RESTORE_ON_EXIT=0
+SERVICE_STOPPED=0
+
+cleanup() {
+  rm -f "$TMP_ENV" "$TMP_PROFILE"
+
+  if [ "$RESTORE_ON_EXIT" -eq 1 ]; then
+    [ -n "$BACKUP_ENV" ] && cp "$BACKUP_ENV" "$ENV_PATH"
+
+    if [ -n "$BACKUP_PROFILE" ] && [ -f "$BACKUP_PROFILE" ]; then
+      cp "$BACKUP_PROFILE" "$CURRENT_PROFILE_PATH"
+    else
+      rm -f "$CURRENT_PROFILE_PATH"
+    fi
+
+    if [ "$SERVICE_STOPPED" -eq 1 ]; then
+      systemctl start "${BASE_NAME}.service" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  rm -f "$BACKUP_ENV" "$BACKUP_PROFILE"
+}
+
+trap cleanup EXIT
 
 usage() {
   cat <<EOF
@@ -57,16 +85,33 @@ load_profile "$PROFILE_NAME"
 # shellcheck disable=SC1090
 source "$ENV_PATH"
 
-echo "Stopping ${BASE_NAME}.service ..."
-systemctl stop "${BASE_NAME}.service"
+TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
+TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
+BACKUP_ENV="$(mktemp "${ENV_PATH}.bak.XXXXXX")"
+cp "$ENV_PATH" "$BACKUP_ENV"
+
+if [ -f "$CURRENT_PROFILE_PATH" ]; then
+  BACKUP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.bak.XXXXXX")"
+  cp "$CURRENT_PROFILE_PATH" "$BACKUP_PROFILE"
+fi
 
 echo "Applying profile ${PROFILE_NAME} (${PROFILE_SUMMARY}) ..."
-write_runtime_env "$ENV_PATH" "$PROFILE_NAME" "$MODEL_PATH" "$VLLM_PORT" "$VLLM_TP" "$CUDA_VISIBLE_DEVICES"
-chmod 640 "$ENV_PATH"
-printf '%s\n' "$PROFILE_NAME" > "$CURRENT_PROFILE_PATH"
-chmod 644 "$CURRENT_PROFILE_PATH"
+write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$VLLM_PORT" "$VLLM_TP" "$CUDA_VISIBLE_DEVICES"
+chmod 640 "$TMP_ENV"
+printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
+chmod 644 "$TMP_PROFILE"
+
+echo "Stopping ${BASE_NAME}.service ..."
+systemctl stop "${BASE_NAME}.service"
+SERVICE_STOPPED=1
+RESTORE_ON_EXIT=1
+
+mv "$TMP_ENV" "$ENV_PATH"
+mv "$TMP_PROFILE" "$CURRENT_PROFILE_PATH"
 
 echo "Starting ${BASE_NAME}.service ..."
 systemctl start "${BASE_NAME}.service"
+RESTORE_ON_EXIT=0
+SERVICE_STOPPED=0
 sleep 2
 systemctl status "${BASE_NAME}.service" --no-pager

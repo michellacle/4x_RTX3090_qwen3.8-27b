@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$PROFILE_NAME" ]; then
-  if [ -t 0 ]; then
+  if [ -t 0 ] && [ -t 1 ]; then
     echo "Available runtime profiles:"
     list_profiles
     echo ""
