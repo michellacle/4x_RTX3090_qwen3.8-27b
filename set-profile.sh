@@ -29,7 +29,10 @@ cleanup() {
     fi
 
     if [ "$SERVICE_STOPPED" -eq 1 ]; then
-      systemctl start "${BASE_NAME}.service" >/dev/null 2>&1 || true
+      systemctl reset-failed "${BASE_NAME}.service" >/dev/null 2>&1 || true
+      if ! systemctl start "${BASE_NAME}.service" >/dev/null 2>&1; then
+        echo "ERROR: Failed to restore ${BASE_NAME}.service with the previous profile." >&2
+      fi
     fi
   fi
 
@@ -80,8 +83,10 @@ if [ ! -f "$ENV_PATH" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$ENV_PATH"
+MODEL_PATH="$(read_env_value "$ENV_PATH" MODEL_PATH)"
+VLLM_PORT="$(read_env_value "$ENV_PATH" VLLM_PORT)"
+VLLM_TP="$(read_env_value "$ENV_PATH" VLLM_TP)"
+CUDA_VISIBLE_DEVICES="$(read_env_value "$ENV_PATH" CUDA_VISIBLE_DEVICES)"
 
 load_profile "$PROFILE_NAME"
 

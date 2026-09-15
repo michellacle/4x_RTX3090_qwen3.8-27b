@@ -125,7 +125,7 @@ Profiles live in `profiles/*.env` in the repo so the team can share working pres
 | `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets |
 | `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled |
 
-`set-profile.sh` stops the systemd service, atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and starts the service again.
+`set-profile.sh` keeps the existing install-specific values (`MODEL_PATH`, `VLLM_PORT`, `VLLM_TP`, and `CUDA_VISIBLE_DEVICES`), atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and restarts the service.
 
 ## API
 

@@ -82,3 +82,35 @@ write_runtime_env() {
     printf 'RUNTIME_PROFILE=%q\n' "$profile_name"
   } > "$env_path"
 }
+
+read_env_value() {
+  local env_path="$1"
+  local key="$2"
+
+  python3 - "$env_path" "$key" <<'PY'
+from pathlib import Path
+import shlex
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+
+for raw_line in env_path.read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or "=" not in raw_line:
+        continue
+
+    current_key, raw_value = raw_line.split("=", 1)
+    if current_key != key:
+        continue
+
+    values = shlex.split(raw_value, posix=True)
+    if len(values) != 1:
+        raise SystemExit(f"ERROR: Invalid value for {key} in {env_path}")
+
+    print(values[0])
+    break
+else:
+    raise SystemExit(f"ERROR: Missing {key} in {env_path}")
+PY
+}
