@@ -16,7 +16,7 @@ PROFILE_NAME=""
 
 require_option_arg() {
   local option_name="$1"
-  if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+  if [ $# -lt 2 ] || [ -z "${2:-}" ] || [[ "${2:-}" == -* ]]; then
     echo "ERROR: ${option_name} requires a value." >&2
     exit 1
   fi

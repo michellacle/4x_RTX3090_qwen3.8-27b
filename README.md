@@ -100,15 +100,15 @@ VLLM_CHECK_ONLY=1 bash serve.sh
 
 All settings are environment variables. See `.env.example` for the full list.
 
-| Variable       | Default   | Description                        |
-|--------------- |-----------|------------------------------------|
-| `VLLM_PORT`    | 8000      | HTTP port                          |
-| `VLLM_TP`      | 4         | Tensor parallel size (GPUs)        |
-| `VLLM_GPU_MEM` | 0.90      | GPU memory utilization fraction    |
-| `VLLM_MAX_LEN` | 262144    | Max context length (tokens)        |
-| `VLLM_MAX_SEQS`| 2         | Max concurrent sequences           |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `VLLM_PORT` | 8000 | HTTP port |
+| `VLLM_TP` | 4 | Tensor parallel size (GPUs) |
+| `VLLM_GPU_MEM` | 0.90 | GPU memory utilization fraction |
+| `VLLM_MAX_LEN` | 262144 | Max context length (tokens) |
+| `VLLM_MAX_SEQS` | 2 | Max concurrent sequences |
 | `VLLM_SPECULATIVE_TOKENS` | 3 | MTP speculative decoding tokens |
-| `VLLM_ENABLE_PREFIX_CACHING` | 1 | Enable prefix caching         |
+| `VLLM_ENABLE_PREFIX_CACHING` | 1 | Enable prefix caching |
 
 Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
 
@@ -117,7 +117,7 @@ Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
 Profiles live in `profiles/*.env` in the repo so the team can share working presets.
 
 | Profile | Tradeoff |
-|---------|----------|
+| --- | --- |
 | `default` | Safe default using the current 262K / 2-sequence settings |
 | `low-latency` | Faster first-token and single-request response times |
 | `high-throughput` | Higher short-job throughput with reduced context |
