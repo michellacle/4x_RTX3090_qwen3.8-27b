@@ -24,6 +24,12 @@ if [ -n "${CUDA_VISIBLE_DEVICES:-}" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPECULATIVE_TOKENS="${VLLM_SPECULATIVE_TOKENS:-3}"
+
+if ! [[ "$SPECULATIVE_TOKENS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: VLLM_SPECULATIVE_TOKENS must be a non-negative integer. Got: ${SPECULATIVE_TOKENS}" >&2
+  exit 1
+fi
 
 VLLM_ARGS=(
   "${MODEL_PATH}"
@@ -43,8 +49,8 @@ VLLM_ARGS=(
   --disable-log-stats
 )
 
-if [ "${VLLM_SPECULATIVE_TOKENS:-3}" -gt 0 ]; then
-  VLLM_ARGS+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${VLLM_SPECULATIVE_TOKENS:-3}}")
+if [ "$SPECULATIVE_TOKENS" -gt 0 ]; then
+  VLLM_ARGS+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${SPECULATIVE_TOKENS}}")
 fi
 
 if [ "${VLLM_ENABLE_PREFIX_CACHING:-1}" = "1" ]; then

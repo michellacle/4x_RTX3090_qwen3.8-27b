@@ -22,6 +22,15 @@ require_option_arg() {
   fi
 }
 
+require_non_negative_integer() {
+  local option_name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: ${option_name} must be a non-negative integer. Got: ${value}" >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) require_option_arg "$@"; PROFILE_NAME="$2"; shift 2 ;;
@@ -44,6 +53,8 @@ MAX_NUM_SEQS="${VLLM_MAX_SEQS:-${PROFILE_VLLM_MAX_SEQS:-2}}"
 SPECULATIVE_TOKENS="${VLLM_SPECULATIVE_TOKENS:-${PROFILE_VLLM_SPECULATIVE_TOKENS:-3}}"
 ENABLE_PREFIX_CACHING="${VLLM_ENABLE_PREFIX_CACHING:-${PROFILE_VLLM_ENABLE_PREFIX_CACHING:-1}}"
 PID_FILE="/tmp/vllm-${PORT}.pid"
+
+require_non_negative_integer "VLLM_SPECULATIVE_TOKENS" "$SPECULATIVE_TOKENS"
 
 # ---- helpers ------------------------------------------------------
 is_running() {

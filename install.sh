@@ -230,8 +230,10 @@ echo ""
 echo "Writing $ENV_PATH ..."
 write_runtime_env "$ENV_PATH" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
 chmod 640 "$ENV_PATH"
-printf '%s\n' "$PROFILE_NAME" > "$CURRENT_PROFILE_PATH"
-chmod 644 "$CURRENT_PROFILE_PATH"
+if [ "$DRY_RUN" -ne 1 ]; then
+  printf '%s\n' "$PROFILE_NAME" > "$CURRENT_PROFILE_PATH"
+  chmod 644 "$CURRENT_PROFILE_PATH"
+fi
 
 # Write systemd unit
 echo "Writing $UNIT_PATH ..."
