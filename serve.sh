@@ -8,16 +8,33 @@ export LD_LIBRARY_PATH=/usr/local/cuda-12.8/targets/x86_64-linux/lib/
 
 # ---- paths --------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/profile-lib.sh"
 VLLM_VENV="${SCRIPT_DIR}/.venv"
 MODEL_PATH="/home/michel/models/qwen3.8-27b-bf16"
+PROFILE_NAME=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile) PROFILE_NAME="$2"; shift 2 ;;
+    --list-profiles) list_profiles; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [ -n "$PROFILE_NAME" ]; then
+  load_profile "$PROFILE_NAME"
+fi
 
 # ---- configuration (override via env vars or .env file) -----------
 PORT="${VLLM_PORT:-8000}"
 HOST="0.0.0.0"
 TENSOR_PARALLEL="${VLLM_TP:-4}"
-GPU_MEM_UTIL="${VLLM_GPU_MEM:-0.90}"
-MAX_MODEL_LEN="${VLLM_MAX_LEN:-262144}"
-MAX_NUM_SEQS="${VLLM_MAX_SEQS:-2}"
+GPU_MEM_UTIL="${VLLM_GPU_MEM:-${PROFILE_VLLM_GPU_MEM:-0.90}}"
+MAX_MODEL_LEN="${VLLM_MAX_LEN:-${PROFILE_VLLM_MAX_LEN:-262144}}"
+MAX_NUM_SEQS="${VLLM_MAX_SEQS:-${PROFILE_VLLM_MAX_SEQS:-2}}"
+SPECULATIVE_TOKENS="${VLLM_SPECULATIVE_TOKENS:-${PROFILE_VLLM_SPECULATIVE_TOKENS:-3}}"
+ENABLE_PREFIX_CACHING="${VLLM_ENABLE_PREFIX_CACHING:-${PROFILE_VLLM_ENABLE_PREFIX_CACHING:-1}}"
 PID_FILE="/tmp/vllm-${PORT}.pid"
 
 # ---- helpers ------------------------------------------------------
@@ -67,25 +84,33 @@ fi
 # ---- launch -------------------------------------------------------
 echo "Starting vLLM on ${HOST}:${PORT} ..."
 
-nohup $VLLM_VENV/bin/vllm serve \
-  "$MODEL_PATH" \
-  --host "$HOST" \
-  --port "$PORT" \
-  --tensor-parallel-size "$TENSOR_PARALLEL" \
-  --gpu-memory-utilization "$GPU_MEM_UTIL" \
-  --max-model-len "$MAX_MODEL_LEN" \
-  --max-num-seqs "$MAX_NUM_SEQS" \
-  --kv-cache-dtype fp8 \
-  --block-size 16 \
-  --disable-custom-all-reduce \
-  --enable-auto-tool-choice \
-  --tool-call-parser qwen3_coder \
-  --served-model-name Qwen/Qwen3.8-27B \
-  --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
-  --enable-prefix-caching \
-  --reasoning-parser qwen3 \
-  --disable-log-stats \
-  2>&1 &> /tmp/vllm-serve.log &
+VLLM_ARGS=(
+  "$MODEL_PATH"
+  --host "$HOST"
+  --port "$PORT"
+  --tensor-parallel-size "$TENSOR_PARALLEL"
+  --gpu-memory-utilization "$GPU_MEM_UTIL"
+  --max-model-len "$MAX_MODEL_LEN"
+  --max-num-seqs "$MAX_NUM_SEQS"
+  --kv-cache-dtype fp8
+  --block-size 16
+  --disable-custom-all-reduce
+  --enable-auto-tool-choice
+  --tool-call-parser qwen3_coder
+  --served-model-name Qwen/Qwen3.8-27B
+  --reasoning-parser qwen3
+  --disable-log-stats
+)
+
+if [ "$SPECULATIVE_TOKENS" -gt 0 ]; then
+  VLLM_ARGS+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${SPECULATIVE_TOKENS}}")
+fi
+
+if [ "$ENABLE_PREFIX_CACHING" = "1" ]; then
+  VLLM_ARGS+=(--enable-prefix-caching)
+fi
+
+nohup "$VLLM_VENV/bin/vllm" serve "${VLLM_ARGS[@]}" 2>&1 &> /tmp/vllm-serve.log &
 
 VLLM_PID=$!
 echo "$VLLM_PID" > "$PID_FILE"

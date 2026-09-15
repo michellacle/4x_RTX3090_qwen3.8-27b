@@ -12,6 +12,8 @@
 #   --model PATH       Model directory (default: ~/models/qwen3.8-27b-bf16)
 #   --hf-repo REPO     Hugging Face repo (default: Qwen/Qwen3.8-27B)
 #   --port NUM         HTTP port (default: 8000)
+#   --profile NAME     Runtime profile (default: prompt or safe default)
+#   --list-profiles    Show available runtime profiles and exit
 #   --user NAME        System user to run as (default: current user)
 #   --skip-download    Skip model download (must already exist)
 #   --dry-run          Show what would be done without making changes
@@ -22,16 +24,20 @@
 # ===================================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/profile-lib.sh"
+
 # ---- defaults -----------------------------------------------------
 BASE_PORT=8000
 HF_REPO="Qwen/Qwen3.8-27B"
 RUN_USER=""
 DRY_RUN=0
 SKIP_DOWNLOAD=0
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_NAME="4x_rtx3090"
 GPUS_PER_INSTANCE=4
 VENV_DIR="${SCRIPT_DIR}/.venv"
+PROFILE_NAME=""
 
 # ---- parse args ---------------------------------------------------
 while [[ $# -gt 0 ]]; do
@@ -39,12 +45,28 @@ while [[ $# -gt 0 ]]; do
     --model)         MODEL_PATH="$2"; shift 2 ;;
     --hf-repo)       HF_REPO="$2";     shift 2 ;;
     --port)          BASE_PORT="$2";   shift 2 ;;
+    --profile)       PROFILE_NAME="$2"; shift 2 ;;
+    --list-profiles) list_profiles; exit 0 ;;
     --user)          RUN_USER="$2";    shift 2 ;;
     --skip-download) SKIP_DOWNLOAD=1;  shift ;;
     --dry-run)       DRY_RUN=1;        shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+if [ -z "$PROFILE_NAME" ]; then
+  if [ -t 0 ]; then
+    echo "Available runtime profiles:"
+    list_profiles
+    echo ""
+    read -rp "Runtime profile [${DEFAULT_PROFILE_NAME}]: " PROFILE_NAME
+    PROFILE_NAME="${PROFILE_NAME:-$DEFAULT_PROFILE_NAME}"
+  else
+    PROFILE_NAME="$DEFAULT_PROFILE_NAME"
+  fi
+fi
+
+load_profile "$PROFILE_NAME"
 
 # ---- determine user -----------------------------------------------
 if [ -z "$RUN_USER" ]; then
@@ -89,13 +111,15 @@ GPUS="0,1,2,3"
 PORT=$BASE_PORT
 UNIT_PATH="/etc/systemd/system/${BASE_NAME}.service"
 ENV_PATH="/etc/${BASE_NAME}.env"
+CURRENT_PROFILE_PATH="/etc/${BASE_NAME}.profile"
 
 echo "=== Install Plan ==="
 echo "  Service: ${BASE_NAME}.service"
+echo "  Profile: ${PROFILE_NAME} (${PROFILE_SUMMARY})"
 echo "  GPUs:    $GPUS"
 echo "  Port:    $PORT"
 echo "  TP:      $GPUS_PER_INSTANCE"
-echo "  Context: 262144 tokens (FP8 KV cache)"
+echo "  Context: ${PROFILE_VLLM_MAX_LEN} tokens"
 echo ""
 
 # ---- install CUDA toolkit -----------------------------------------
@@ -206,16 +230,10 @@ chown "${RUN_USER}:${RUN_USER}" "/var/log/${BASE_NAME}" 2>/dev/null || true
 # Write environment file
 echo ""
 echo "Writing $ENV_PATH ..."
-cat > "$ENV_PATH" <<EOF
-MODEL_PATH=${MODEL_PATH}
-VLLM_PORT=${PORT}
-VLLM_TP=${GPUS_PER_INSTANCE}
-VLLM_GPU_MEM=0.90
-VLLM_MAX_LEN=262144
-VLLM_MAX_SEQS=2
-CUDA_VISIBLE_DEVICES=${GPUS}
-EOF
+write_runtime_env "$ENV_PATH" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
 chmod 640 "$ENV_PATH"
+printf '%s\n' "$PROFILE_NAME" > "$CURRENT_PROFILE_PATH"
+chmod 644 "$CURRENT_PROFILE_PATH"
 
 # Write systemd unit
 echo "Writing $UNIT_PATH ..."
@@ -267,6 +285,7 @@ for attempt in $(seq 1 180); do
     echo "  systemd:  systemctl status ${BASE_NAME}"
     echo "  logs:     journalctl -u ${BASE_NAME} -f"
     echo "  restart:  sudo bash ${SCRIPT_DIR}/restart.sh"
+    echo "  profile:  sudo bash ${SCRIPT_DIR}/set-profile.sh <name>"
     echo "  test:     bash ${SCRIPT_DIR}/test.sh"
     echo "  stop:     sudo bash ${SCRIPT_DIR}/uninstall.sh"
     echo ""

@@ -15,6 +15,7 @@ fi
 BASE_NAME="4x_rtx3090"
 UNIT_PATH="/etc/systemd/system/${BASE_NAME}.service"
 ENV_PATH="/etc/${BASE_NAME}.env"
+CURRENT_PROFILE_PATH="/etc/${BASE_NAME}.profile"
 
 echo "=== Uninstalling ${BASE_NAME} ==="
 
@@ -32,6 +33,9 @@ rm -f "$UNIT_PATH"
 
 echo "  Removing environment file: $ENV_PATH"
 rm -f "$ENV_PATH"
+
+echo "  Removing current profile file: $CURRENT_PROFILE_PATH"
+rm -f "$CURRENT_PROFILE_PATH"
 
 echo "  Removing log directory: /var/log/${BASE_NAME}"
 rm -rf "/var/log/${BASE_NAME}"

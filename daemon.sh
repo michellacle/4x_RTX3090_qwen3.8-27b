@@ -25,21 +25,30 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-exec "${SCRIPT_DIR}/.venv/bin/vllm" serve \
-  "${MODEL_PATH}" \
-  --host "${VLLM_HOST:-0.0.0.0}" \
-  --port "${VLLM_PORT:-8000}" \
-  --tensor-parallel-size "${VLLM_TP:-4}" \
-  --gpu-memory-utilization "${VLLM_GPU_MEM:-0.90}" \
-  --max-model-len "${VLLM_MAX_LEN:-262144}" \
-  --max-num-seqs "${VLLM_MAX_SEQS:-2}" \
-  --kv-cache-dtype fp8 \
-  --block-size 16 \
-  --disable-custom-all-reduce \
-  --enable-auto-tool-choice \
-  --tool-call-parser qwen3_coder \
-  --served-model-name Qwen/Qwen3.8-27B \
-  --speculative-config '{"method":"mtp","num_speculative_tokens":3}' \
-  --enable-prefix-caching \
-  --reasoning-parser qwen3 \
+VLLM_ARGS=(
+  "${MODEL_PATH}"
+  --host "${VLLM_HOST:-0.0.0.0}"
+  --port "${VLLM_PORT:-8000}"
+  --tensor-parallel-size "${VLLM_TP:-4}"
+  --gpu-memory-utilization "${VLLM_GPU_MEM:-0.90}"
+  --max-model-len "${VLLM_MAX_LEN:-262144}"
+  --max-num-seqs "${VLLM_MAX_SEQS:-2}"
+  --kv-cache-dtype fp8
+  --block-size 16
+  --disable-custom-all-reduce
+  --enable-auto-tool-choice
+  --tool-call-parser qwen3_coder
+  --served-model-name Qwen/Qwen3.8-27B
+  --reasoning-parser qwen3
   --disable-log-stats
+)
+
+if [ "${VLLM_SPECULATIVE_TOKENS:-3}" -gt 0 ]; then
+  VLLM_ARGS+=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":${VLLM_SPECULATIVE_TOKENS:-3}}")
+fi
+
+if [ "${VLLM_ENABLE_PREFIX_CACHING:-1}" = "1" ]; then
+  VLLM_ARGS+=(--enable-prefix-caching)
+fi
+
+exec "${SCRIPT_DIR}/.venv/bin/vllm" serve "${VLLM_ARGS[@]}"
