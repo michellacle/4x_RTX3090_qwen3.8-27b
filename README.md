@@ -34,8 +34,8 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 sudo bash install.sh
 ```
 
-On first install, the script shows the available runtime profiles and lets you pick one.
-If the installer is non-interactive, it uses the safe `default` profile automatically.
+When stdin is interactive, the installer shows the available runtime profiles and lets you pick one.
+If the installer is non-interactive, it uses the safe `default` profile automatically, or you can pass `--profile <name>` explicitly.
 
 Options:
 

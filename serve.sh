@@ -14,9 +14,17 @@ VLLM_VENV="${SCRIPT_DIR}/.venv"
 MODEL_PATH="/home/michel/models/qwen3.8-27b-bf16"
 PROFILE_NAME=""
 
+require_option_arg() {
+  local option_name="$1"
+  if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+    echo "ERROR: ${option_name} requires a value." >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profile) PROFILE_NAME="$2"; shift 2 ;;
+    --profile) require_option_arg "$@"; PROFILE_NAME="$2"; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

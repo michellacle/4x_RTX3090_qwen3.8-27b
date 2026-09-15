@@ -32,6 +32,11 @@ case "${1:-}" in
     usage
     exit 0
     ;;
+  -*)
+    echo "ERROR: Unknown option: $1" >&2
+    usage >&2
+    exit 1
+    ;;
   *)
     PROFILE_NAME="$1"
     ;;
