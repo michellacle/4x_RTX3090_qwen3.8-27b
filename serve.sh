@@ -77,18 +77,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [ -n "$PROFILE_NAME" ]; then
-  load_profile "$PROFILE_NAME"
-fi
-
 quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
-# ---- configuration (override via env vars or .env file) -----------
 if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
   if [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
     MODEL_PATH=""
   fi
 fi
+
+if [ -n "$PROFILE_NAME" ]; then
+  load_profile "$PROFILE_NAME"
+fi
+
+# ---- configuration (override via env vars or .env file) -----------
 MODEL_PATH="${MODEL_PATH:-${MODEL_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
 PORT="${VLLM_PORT:-8000}"
 HOST="0.0.0.0"
