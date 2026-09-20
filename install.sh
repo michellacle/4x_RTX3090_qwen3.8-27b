@@ -191,7 +191,7 @@ if [ "$MODEL_EXISTS" -eq 0 ]; then
     exit 1
   fi
 
-  if [ -z "$HF_REPO" ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
+  if [ "$SKIP_DOWNLOAD" -eq 0 ] && [ -z "$HF_REPO" ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
     echo "ERROR: --hf-repo (or HF_REPO env var) is required for quantization '${MODEL_QUANTIZATION}' when downloading." >&2
     echo "       Example: sudo bash install.sh --quantization ${MODEL_QUANTIZATION} --hf-repo <owner/repo>" >&2
     exit 1
