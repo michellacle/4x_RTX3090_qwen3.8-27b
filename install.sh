@@ -10,7 +10,7 @@
 #
 # Options:
 #   --model PATH       Model directory (default: ~/models/qwen3.8-27b-bf16)
-#   --hf-repo REPO     Hugging Face repo (default: Qwen/Qwen3.8-27B)
+#   --hf-repo REPO     Hugging Face repo (default for bf16: Qwen/Qwen3.8-27B)
 #   --quantization Q   Quantization preset: bf16 | q8 | q6 (default: bf16)
 #                      For q8/q6 downloads, also pass --hf-repo <owner/repo>.
 #   --port NUM         HTTP port (default: 8000)
@@ -33,7 +33,7 @@ source "${SCRIPT_DIR}/profile-lib.sh"
 
 # ---- defaults -----------------------------------------------------
 BASE_PORT=8000
-HF_REPO="Qwen/Qwen3.8-27B"
+HF_REPO="${HF_REPO:-}"
 RUN_USER=""
 DRY_RUN=0
 SKIP_DOWNLOAD=0
@@ -43,7 +43,6 @@ VENV_DIR="${SCRIPT_DIR}/.venv"
 PROFILE_NAME=""
 MODEL_QUANTIZATION="bf16"
 MODEL_PATH_EXPLICIT=0
-HF_REPO_EXPLICIT=0
 
 quantization_model_dirname() {
   case "$1" in
@@ -77,7 +76,7 @@ require_option_arg() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model)         require_option_arg "--model" "$@"; MODEL_PATH="$2"; MODEL_PATH_EXPLICIT=1; shift 2 ;;
-    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2"; HF_REPO_EXPLICIT=1; shift 2 ;;
+    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2"; shift 2 ;;
     --quantization)  require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
     --port)          require_option_arg "--port" "$@"; BASE_PORT="$2";   shift 2 ;;
     --profile)       require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
@@ -108,6 +107,10 @@ fi
 RUN_HOME=$(eval echo "~${RUN_USER}")
 if [ "$MODEL_PATH_EXPLICIT" -eq 0 ]; then
   MODEL_PATH="${RUN_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")"
+fi
+
+if [ -z "$HF_REPO" ] && [ "$MODEL_QUANTIZATION" = "bf16" ]; then
+  HF_REPO="Qwen/Qwen3.8-27B"
 fi
 
 # ---- pre-flight checks --------------------------------------------
@@ -188,8 +191,8 @@ if [ "$MODEL_EXISTS" -eq 0 ]; then
     exit 1
   fi
 
-  if [ "$HF_REPO_EXPLICIT" -eq 0 ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
-    echo "ERROR: --hf-repo is required for quantization '${MODEL_QUANTIZATION}' when downloading." >&2
+  if [ -z "$HF_REPO" ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
+    echo "ERROR: --hf-repo (or HF_REPO env var) is required for quantization '${MODEL_QUANTIZATION}' when downloading." >&2
     echo "       Example: sudo bash install.sh --quantization ${MODEL_QUANTIZATION} --hf-repo <owner/repo>" >&2
     exit 1
   fi
