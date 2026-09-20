@@ -27,7 +27,11 @@ MODEL_PATH_CLI_EXPLICIT=0
 MODEL_HOME="${HOME}"
 
 if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
-  MODEL_HOME="$(eval echo "~${SUDO_USER}")"
+  MODEL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+  if [ -z "$MODEL_HOME" ]; then
+    echo "ERROR: Could not determine home directory for user: $SUDO_USER" >&2
+    exit 1
+  fi
 fi
 
 quantization_model_dirname() {

@@ -104,7 +104,11 @@ if [ -z "$RUN_USER" ]; then
   fi
 fi
 
-RUN_HOME=$(eval echo "~${RUN_USER}")
+RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+if [ -z "$RUN_HOME" ]; then
+  echo "ERROR: Could not determine home directory for user: $RUN_USER" >&2
+  exit 1
+fi
 if [ "$MODEL_PATH_EXPLICIT" -eq 0 ]; then
   MODEL_PATH="${RUN_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")"
 fi
