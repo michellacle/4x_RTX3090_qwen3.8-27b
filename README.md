@@ -19,7 +19,7 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 | CUDA toolkit (nvcc) | 12.0+ (installed by `install.sh`) | JIT compilation for Triton/FlashInfer kernels |
 | ninja-build | any (installed by `install.sh`) | Build system for FlashInfer |
 | Python | 3.12+ | Virtual environment created automatically |
-| Disk | ~55 GB+ | Depends on quantization model weights + venv + cache |
+| Disk | ~20-55 GB | Approx. Q6 to BF16 model weights + venv + cache |
 | RAM | 32 GB recommended | Model loading uses shared memory |
 
 > **How CUDA works here:** The NVIDIA driver ships CUDA runtime libraries

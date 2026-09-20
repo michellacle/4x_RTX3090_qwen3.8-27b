@@ -13,6 +13,7 @@ source "${SCRIPT_DIR}/profile-lib.sh"
 VLLM_VENV="${SCRIPT_DIR}/.venv"
 PROFILE_NAME=""
 MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
+QUANTIZATION_EXPLICIT=0
 
 quantization_model_dirname() {
   case "$1" in
@@ -54,7 +55,7 @@ require_non_negative_integer() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
-    --quantization) require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
+    --quantization) require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; QUANTIZATION_EXPLICIT=1; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
     --list-quantizations) list_quantizations; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -68,6 +69,9 @@ fi
 quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- configuration (override via env vars or .env file) -----------
+if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
+  MODEL_PATH=""
+fi
 MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
 PORT="${VLLM_PORT:-8000}"
 HOST="0.0.0.0"
