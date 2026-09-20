@@ -61,11 +61,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
-
 if [ -n "$PROFILE_NAME" ]; then
   load_profile "$PROFILE_NAME"
 fi
+
+quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- configuration (override via env vars or .env file) -----------
 MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
