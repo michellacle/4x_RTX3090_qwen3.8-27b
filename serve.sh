@@ -15,6 +15,11 @@ PROFILE_NAME=""
 MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
 QUANTIZATION_EXPLICIT=0
 MODEL_PATH_CLI_EXPLICIT=0
+MODEL_HOME="${HOME}"
+
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+  MODEL_HOME="$(eval echo "~${SUDO_USER}")"
+fi
 
 quantization_model_dirname() {
   case "$1" in
@@ -76,7 +81,7 @@ if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
     MODEL_PATH=""
   fi
 fi
-MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
+MODEL_PATH="${MODEL_PATH:-${MODEL_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
 PORT="${VLLM_PORT:-8000}"
 HOST="0.0.0.0"
 TENSOR_PARALLEL="${VLLM_TP:-4}"
