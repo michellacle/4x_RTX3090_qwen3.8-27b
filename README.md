@@ -114,16 +114,16 @@ Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
 
 ## Runtime profiles
 
-Profiles live in `profiles/*.env` in the repo so the team can share working presets.
+Profiles live in `profiles/*.env` in the repo so the team can share working presets. Each profile changes these runtime variables: `VLLM_GPU_MEM`, `VLLM_MAX_LEN`, `VLLM_MAX_SEQS`, `VLLM_SPECULATIVE_TOKENS`, and `VLLM_ENABLE_PREFIX_CACHING`.
 
-| Profile | Tradeoff |
-| --- | --- |
-| `default` | Safe default using the current 262K / 2-sequence settings |
-| `low-latency` | Faster first-token and single-request response times |
-| `high-throughput` | Higher short-job throughput with reduced context |
-| `aggressive` | Fastest / lowest-quality preset for short prompts and bulk experimentation |
-| `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets |
-| `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled |
+| Profile | Tradeoff | `VLLM_GPU_MEM` | `VLLM_MAX_LEN` | `VLLM_MAX_SEQS` | `VLLM_SPECULATIVE_TOKENS` | `VLLM_ENABLE_PREFIX_CACHING` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `default` | Safe default using the current 262K / 2-sequence settings | `0.90` | `262144` | `2` | `3` | `1` |
+| `low-latency` | Faster first-token and single-request response times | `0.88` | `131072` | `1` | `4` | `1` |
+| `high-throughput` | Higher short-job throughput with reduced context | `0.92` | `65536` | `4` | `5` | `1` |
+| `aggressive` | Fastest / lowest-quality preset for short prompts and bulk experimentation | `0.93` | `32768` | `6` | `6` | `1` |
+| `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets | `0.90` | `262144` | `1` | `2` | `1` |
+| `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled | `0.88` | `262144` | `1` | `0` | `1` |
 
 `set-profile.sh` keeps the existing install-specific values (`MODEL_PATH`, `VLLM_PORT`, `VLLM_TP`, and `CUDA_VISIBLE_DEVICES`), atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and restarts the service.
 
