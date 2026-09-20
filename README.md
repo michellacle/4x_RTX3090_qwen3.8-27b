@@ -81,6 +81,7 @@ sudo bash uninstall.sh                  # remove service
 bash serve.sh
 bash serve.sh --profile low-latency
 bash serve.sh --quantization q8 --profile high-throughput
+bash serve.sh --quantization q8 --model /path/to/q8-model
 
 # List profiles
 bash serve.sh --list-profiles

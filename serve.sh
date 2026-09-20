@@ -13,8 +13,8 @@ source "${SCRIPT_DIR}/profile-lib.sh"
 VLLM_VENV="${SCRIPT_DIR}/.venv"
 PROFILE_NAME=""
 MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
-ORIGINAL_MODEL_QUANTIZATION="$MODEL_QUANTIZATION"
 QUANTIZATION_EXPLICIT=0
+MODEL_PATH_CLI_EXPLICIT=0
 
 quantization_model_dirname() {
   case "$1" in
@@ -55,6 +55,7 @@ require_non_negative_integer() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --model) require_option_arg "--model" "$@"; MODEL_PATH="$2"; MODEL_PATH_CLI_EXPLICIT=1; shift 2 ;;
     --profile) require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
     --quantization) require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; QUANTIZATION_EXPLICIT=1; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
@@ -71,19 +72,9 @@ quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- configuration (override via env vars or .env file) -----------
 if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
-  case "$ORIGINAL_MODEL_QUANTIZATION" in
-    bf16|q8|q6)
-      ORIGINAL_MODEL_DIRNAME="$(quantization_model_dirname "$ORIGINAL_MODEL_QUANTIZATION")"
-      if [ -z "${MODEL_PATH:-}" ] || [[ "${MODEL_PATH:-}" == */"${ORIGINAL_MODEL_DIRNAME}" ]]; then
-        MODEL_PATH=""
-      fi
-      ;;
-    *)
-      if [ -z "${MODEL_PATH:-}" ]; then
-        MODEL_PATH=""
-      fi
-      ;;
-  esac
+  if [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
+    MODEL_PATH=""
+  fi
 fi
 MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
 PORT="${VLLM_PORT:-8000}"
