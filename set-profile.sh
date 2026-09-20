@@ -94,7 +94,8 @@ if [ ! -f "$ENV_PATH" ]; then
 fi
 
 MODEL_PATH="$(read_env_value "$ENV_PATH" MODEL_PATH)"
-MODEL_QUANTIZATION="$(read_env_value "$ENV_PATH" MODEL_QUANTIZATION 2>/dev/null || echo bf16)"
+MODEL_QUANTIZATION="$(read_env_value "$ENV_PATH" MODEL_QUANTIZATION 2>/dev/null || true)"
+MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
 VLLM_PORT="$(read_env_value "$ENV_PATH" VLLM_PORT)"
 VLLM_TP="$(read_env_value "$ENV_PATH" VLLM_TP)"
 CUDA_VISIBLE_DEVICES="$(read_env_value "$ENV_PATH" CUDA_VISIBLE_DEVICES)"
