@@ -14,6 +14,11 @@ VLLM_VENV="${SCRIPT_DIR}/.venv"
 PROFILE_NAME=""
 MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
 QUANTIZATION_EXPLICIT=0
+MODEL_PATH_FROM_ENV=0
+
+if [ -n "${MODEL_PATH:-}" ]; then
+  MODEL_PATH_FROM_ENV=1
+fi
 
 quantization_model_dirname() {
   case "$1" in
@@ -69,7 +74,7 @@ fi
 quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- configuration (override via env vars or .env file) -----------
-if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
+if [ "$QUANTIZATION_EXPLICIT" -eq 1 ] && [ "$MODEL_PATH_FROM_ENV" -eq 0 ]; then
   MODEL_PATH=""
 fi
 MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"

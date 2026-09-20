@@ -12,6 +12,7 @@
 #   --model PATH       Model directory (default: ~/models/qwen3.8-27b-bf16)
 #   --hf-repo REPO     Hugging Face repo (default: Qwen/Qwen3.8-27B)
 #   --quantization Q   Quantization preset: bf16 | q8 | q6 (default: bf16)
+#                      For q8/q6 downloads, also pass --hf-repo <owner/repo>.
 #   --port NUM         HTTP port (default: 8000)
 #   --profile NAME     Runtime profile (default: prompt or safe default)
 #   --list-profiles    Show available runtime profiles and exit

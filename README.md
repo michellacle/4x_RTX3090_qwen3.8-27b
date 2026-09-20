@@ -50,6 +50,8 @@ sudo bash install.sh --skip-download                    # model already on disk
 sudo bash install.sh --dry-run                          # preview without installing
 ```
 
+For `--quantization q8` or `--quantization q6`, pass `--hf-repo <owner/repo>` when downloading.
+
 Hugging Face token (required for download):
 
 ```bash
