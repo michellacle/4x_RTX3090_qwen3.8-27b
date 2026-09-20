@@ -21,6 +21,7 @@ fi
 
 PROFILE_NAME=""
 MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
+ORIGINAL_MODEL_QUANTIZATION="$MODEL_QUANTIZATION"
 QUANTIZATION_EXPLICIT=0
 MODEL_PATH_CLI_EXPLICIT=0
 MODEL_HOME="${HOME}"
@@ -84,7 +85,19 @@ if [ -n "$PROFILE_NAME" ]; then
 fi
 
 if [ "$QUANTIZATION_EXPLICIT" -eq 1 ] && [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
-  MODEL_PATH=""
+  case "$ORIGINAL_MODEL_QUANTIZATION" in
+    bf16|q8|q6)
+      PREVIOUS_DEFAULT_MODEL_PATH="${MODEL_HOME}/models/$(quantization_model_dirname "$ORIGINAL_MODEL_QUANTIZATION")"
+      if [ -z "${MODEL_PATH:-}" ] || [ "${MODEL_PATH:-}" = "$PREVIOUS_DEFAULT_MODEL_PATH" ]; then
+        MODEL_PATH=""
+      fi
+      ;;
+    *)
+      if [ -z "${MODEL_PATH:-}" ]; then
+        MODEL_PATH=""
+      fi
+      ;;
+  esac
 fi
 
 # ---- configuration (override via env vars or .env file) -----------
