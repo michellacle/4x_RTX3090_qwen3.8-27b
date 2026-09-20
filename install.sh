@@ -109,12 +109,6 @@ if [ "$MODEL_PATH_EXPLICIT" -eq 0 ]; then
   MODEL_PATH="${RUN_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")"
 fi
 
-if [ "$HF_REPO_EXPLICIT" -eq 0 ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
-  echo "ERROR: --hf-repo is required for quantization '${MODEL_QUANTIZATION}'." >&2
-  echo "       Example: sudo bash install.sh --quantization ${MODEL_QUANTIZATION} --hf-repo <owner/repo>" >&2
-  exit 1
-fi
-
 # ---- pre-flight checks --------------------------------------------
 echo "=== Qwen3.8-27B Server Installer (${MODEL_QUANTIZATION^^}, 4x RTX 3090) ==="
 echo ""
@@ -190,6 +184,12 @@ fi
 if [ "$MODEL_EXISTS" -eq 0 ]; then
   if [ "$SKIP_DOWNLOAD" -eq 1 ]; then
     echo "ERROR: Model not found at $MODEL_PATH and --skip-download is set." >&2
+    exit 1
+  fi
+
+  if [ "$HF_REPO_EXPLICIT" -eq 0 ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
+    echo "ERROR: --hf-repo is required for quantization '${MODEL_QUANTIZATION}' when downloading." >&2
+    echo "       Example: sudo bash install.sh --quantization ${MODEL_QUANTIZATION} --hf-repo <owner/repo>" >&2
     exit 1
   fi
 
