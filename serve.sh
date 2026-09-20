@@ -79,14 +79,12 @@ done
 
 quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
-if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
-  if [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
-    MODEL_PATH=""
-  fi
-fi
-
 if [ -n "$PROFILE_NAME" ]; then
   load_profile "$PROFILE_NAME"
+fi
+
+if [ "$QUANTIZATION_EXPLICIT" -eq 1 ] && [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
+  MODEL_PATH=""
 fi
 
 # ---- configuration (override via env vars or .env file) -----------
