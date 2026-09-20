@@ -73,8 +73,8 @@ quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
   case "$ORIGINAL_MODEL_QUANTIZATION" in
     bf16|q8|q6)
-      ORIGINAL_DEFAULT_MODEL_PATH="${HOME}/models/$(quantization_model_dirname "$ORIGINAL_MODEL_QUANTIZATION")"
-      if [ -z "${MODEL_PATH:-}" ] || [ "${MODEL_PATH:-}" = "$ORIGINAL_DEFAULT_MODEL_PATH" ]; then
+      ORIGINAL_MODEL_DIRNAME="$(quantization_model_dirname "$ORIGINAL_MODEL_QUANTIZATION")"
+      if [ -z "${MODEL_PATH:-}" ] || [[ "${MODEL_PATH:-}" == */"${ORIGINAL_MODEL_DIRNAME}" ]]; then
         MODEL_PATH=""
       fi
       ;;
