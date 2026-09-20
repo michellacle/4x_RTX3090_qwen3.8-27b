@@ -85,7 +85,7 @@ quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- configuration (override via env vars or .env file) -----------
 if [ "$QUANTIZATION_EXPLICIT" -eq 1 ]; then
-  if [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ] && [ -z "$PROFILE_NAME" ]; then
+  if [ "$MODEL_PATH_CLI_EXPLICIT" -eq 0 ]; then
     MODEL_PATH=""
   fi
 fi
