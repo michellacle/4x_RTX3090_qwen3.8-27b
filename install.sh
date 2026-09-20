@@ -11,9 +11,11 @@
 # Options:
 #   --model PATH       Model directory (default: ~/models/qwen3.8-27b-bf16)
 #   --hf-repo REPO     Hugging Face repo (default: Qwen/Qwen3.8-27B)
+#   --quantization Q   Quantization preset: bf16 | q8 | q6 (default: bf16)
 #   --port NUM         HTTP port (default: 8000)
 #   --profile NAME     Runtime profile (default: prompt or safe default)
 #   --list-profiles    Show available runtime profiles and exit
+#   --list-quantizations Show available quantization presets and exit
 #   --user NAME        System user to run as (default: current user)
 #   --skip-download    Skip model download (must already exist)
 #   --dry-run          Show what would be done without making changes
@@ -38,6 +40,29 @@ BASE_NAME="4x_rtx3090"
 GPUS_PER_INSTANCE=4
 VENV_DIR="${SCRIPT_DIR}/.venv"
 PROFILE_NAME=""
+MODEL_QUANTIZATION="bf16"
+MODEL_PATH_EXPLICIT=0
+HF_REPO_EXPLICIT=0
+
+quantization_model_dirname() {
+  case "$1" in
+    bf16) echo "qwen3.8-27b-bf16" ;;
+    q8) echo "qwen3.8-27b-q8" ;;
+    q6) echo "qwen3.8-27b-q6" ;;
+    *)
+      echo "ERROR: Unsupported quantization: $1 (expected: bf16, q8, q6)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+list_quantizations() {
+  cat <<EOF
+  bf16                 Full-precision BF16 weights
+  q8                   8-bit quantized weights (model/repo dependent)
+  q6                   6-bit quantized weights (model/repo dependent)
+EOF
+}
 
 require_option_arg() {
   local option_name="$1"
@@ -50,11 +75,13 @@ require_option_arg() {
 # ---- parse args ---------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)         require_option_arg "--model" "$@"; MODEL_PATH="$2"; shift 2 ;;
-    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2";     shift 2 ;;
+    --model)         require_option_arg "--model" "$@"; MODEL_PATH="$2"; MODEL_PATH_EXPLICIT=1; shift 2 ;;
+    --hf-repo)       require_option_arg "--hf-repo" "$@"; HF_REPO="$2"; HF_REPO_EXPLICIT=1; shift 2 ;;
+    --quantization)  require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
     --port)          require_option_arg "--port" "$@"; BASE_PORT="$2";   shift 2 ;;
     --profile)       require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
+    --list-quantizations) list_quantizations; exit 0 ;;
     --user)          require_option_arg "--user" "$@"; RUN_USER="$2";    shift 2 ;;
     --skip-download) SKIP_DOWNLOAD=1;  shift ;;
     --dry-run)       DRY_RUN=1;        shift ;;
@@ -65,6 +92,7 @@ done
 PROFILE_NAME="${PROFILE_NAME:-$DEFAULT_PROFILE_NAME}"
 
 load_profile "$PROFILE_NAME"
+quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 # ---- determine user -----------------------------------------------
 if [ -z "$RUN_USER" ]; then
@@ -77,10 +105,18 @@ if [ -z "$RUN_USER" ]; then
 fi
 
 RUN_HOME=$(eval echo "~${RUN_USER}")
-MODEL_PATH="${MODEL_PATH:-${RUN_HOME}/models/qwen3.8-27b-bf16}"
+if [ "$MODEL_PATH_EXPLICIT" -eq 0 ]; then
+  MODEL_PATH="${RUN_HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")"
+fi
+
+if [ "$HF_REPO_EXPLICIT" -eq 0 ] && [ "$MODEL_QUANTIZATION" != "bf16" ]; then
+  echo "ERROR: --hf-repo is required for quantization '${MODEL_QUANTIZATION}'." >&2
+  echo "       Example: sudo bash install.sh --quantization ${MODEL_QUANTIZATION} --hf-repo <owner/repo>" >&2
+  exit 1
+fi
 
 # ---- pre-flight checks --------------------------------------------
-echo "=== Qwen3.8-27B Server Installer BF16 (4x RTX 3090) ==="
+echo "=== Qwen3.8-27B Server Installer (${MODEL_QUANTIZATION^^}, 4x RTX 3090) ==="
 echo ""
 
 # ---- detect GPUs --------------------------------------------------
@@ -114,6 +150,7 @@ CURRENT_PROFILE_PATH="/etc/${BASE_NAME}.profile"
 echo "=== Install Plan ==="
 echo "  Service: ${BASE_NAME}.service"
 echo "  Profile: ${PROFILE_NAME} (${PROFILE_SUMMARY})"
+echo "  Quant:   ${MODEL_QUANTIZATION}"
 echo "  GPUs:    $GPUS"
 echo "  Port:    $PORT"
 echo "  TP:      $GPUS_PER_INSTANCE"
@@ -231,7 +268,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
   echo "Writing $ENV_PATH ..."
   TMP_ENV="$(mktemp "${ENV_PATH}.tmp.XXXXXX")"
   TMP_PROFILE="$(mktemp "${CURRENT_PROFILE_PATH}.tmp.XXXXXX")"
-  write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
+  write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_QUANTIZATION" "$MODEL_PATH" "$PORT" "$GPUS_PER_INSTANCE" "$GPUS"
   chmod 640 "$TMP_ENV"
   printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
   chmod 644 "$TMP_PROFILE"

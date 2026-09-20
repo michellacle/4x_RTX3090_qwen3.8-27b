@@ -94,6 +94,7 @@ if [ ! -f "$ENV_PATH" ]; then
 fi
 
 MODEL_PATH="$(read_env_value "$ENV_PATH" MODEL_PATH)"
+MODEL_QUANTIZATION="$(read_env_value "$ENV_PATH" MODEL_QUANTIZATION 2>/dev/null || echo bf16)"
 VLLM_PORT="$(read_env_value "$ENV_PATH" VLLM_PORT)"
 VLLM_TP="$(read_env_value "$ENV_PATH" VLLM_TP)"
 CUDA_VISIBLE_DEVICES="$(read_env_value "$ENV_PATH" CUDA_VISIBLE_DEVICES)"
@@ -111,7 +112,7 @@ if [ -f "$CURRENT_PROFILE_PATH" ]; then
 fi
 
 echo "Applying profile ${PROFILE_NAME} (${PROFILE_SUMMARY}) ..."
-write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_PATH" "$VLLM_PORT" "$VLLM_TP" "$CUDA_VISIBLE_DEVICES"
+write_runtime_env "$TMP_ENV" "$PROFILE_NAME" "$MODEL_QUANTIZATION" "$MODEL_PATH" "$VLLM_PORT" "$VLLM_TP" "$CUDA_VISIBLE_DEVICES"
 chmod 640 "$TMP_ENV"
 printf '%s\n' "$PROFILE_NAME" > "$TMP_PROFILE"
 chmod 644 "$TMP_PROFILE"

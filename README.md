@@ -2,7 +2,7 @@
 
 Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 
-- **Model:** Qwen3.8-27B (BF16)
+- **Model:** Qwen3.8-27B (BF16, Q8, or Q6 checkpoints)
 - **Hardware:** 4x NVIDIA RTX 3090 (24 GB each)
 - **Tensor parallel:** 4 (all GPUs)
 - **Context:** 262,144 tokens (FP8 KV cache)
@@ -19,7 +19,7 @@ Single-purpose LLM server. One model, one hardware configuration, zero bloat.
 | CUDA toolkit (nvcc) | 12.0+ (installed by `install.sh`) | JIT compilation for Triton/FlashInfer kernels |
 | ninja-build | any (installed by `install.sh`) | Build system for FlashInfer |
 | Python | 3.12+ | Virtual environment created automatically |
-| Disk | ~55 GB | BF16 model weights + venv + cache |
+| Disk | ~55 GB+ | Depends on quantization model weights + venv + cache |
 | RAM | 32 GB recommended | Model loading uses shared memory |
 
 > **How CUDA works here:** The NVIDIA driver ships CUDA runtime libraries
@@ -42,7 +42,9 @@ Options:
 ```bash
 sudo bash install.sh --model /path/to/model --port 9000
 sudo bash install.sh --profile low-latency
+sudo bash install.sh --quantization q8 --hf-repo <owner/repo>
 sudo bash install.sh --list-profiles
+sudo bash install.sh --list-quantizations
 sudo bash install.sh --hf-repo Qwen/Qwen3.8-27B    # custom HF repo
 sudo bash install.sh --skip-download                    # model already on disk
 sudo bash install.sh --dry-run                          # preview without installing
@@ -76,9 +78,11 @@ sudo bash uninstall.sh                  # remove service
 # Start (with startup benchmark)
 bash serve.sh
 bash serve.sh --profile low-latency
+bash serve.sh --quantization q8 --profile high-throughput
 
 # List profiles
 bash serve.sh --list-profiles
+bash serve.sh --list-quantizations
 
 # Stop
 bash kill-vllm.sh
@@ -102,6 +106,7 @@ All settings are environment variables. See `.env.example` for the full list.
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `MODEL_QUANTIZATION` | bf16 | Quantization preset (`bf16`, `q8`, `q6`) used for default model path |
 | `VLLM_PORT` | 8000 | HTTP port |
 | `VLLM_TP` | 4 | Tensor parallel size (GPUs) |
 | `VLLM_GPU_MEM` | 0.90 | GPU memory utilization fraction |
@@ -112,9 +117,10 @@ All settings are environment variables. See `.env.example` for the full list.
 
 Override inline: `VLLM_PORT=9000 VLLM_GPU_MEM=0.92 bash serve.sh`
 
-## Runtime profiles
+## Runtime profiles and quantizations
 
 Profiles live in `profiles/*.env` in the repo so the team can share working presets.
+Quantization is selected independently (`bf16`, `q8`, `q6`) so every profile can be used with every quantization.
 
 | Profile | Tradeoff |
 | --- | --- |
@@ -125,7 +131,7 @@ Profiles live in `profiles/*.env` in the repo so the team can share working pres
 | `long-context` | Better for large prompts and retrieval-heavy work, slower than fast presets |
 | `quality-focused` | Slowest preset with long context, low concurrency, and speculative decoding disabled |
 
-`set-profile.sh` keeps the existing install-specific values (`MODEL_PATH`, `VLLM_PORT`, `VLLM_TP`, and `CUDA_VISIBLE_DEVICES`), atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and restarts the service.
+`set-profile.sh` keeps the existing install-specific values (`MODEL_QUANTIZATION`, `MODEL_PATH`, `VLLM_PORT`, `VLLM_TP`, and `CUDA_VISIBLE_DEVICES`), atomically replaces `/etc/4x_rtx3090.env` with the selected preset, records the active profile in `/etc/4x_rtx3090.profile`, and restarts the service.
 
 ## API
 
@@ -149,7 +155,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ## Features
 
-- **BF16 precision** — full-precision weights on 96 GB VRAM
+- **Multiple quantizations** — BF16, Q8, and Q6 profile-compatible workflows
 - **FP8 KV cache** — extended context with reduced memory
 - **Multi-token prediction** — 3 speculative tokens via MTP
 - **Prefix caching** — fast repeated prefixes (e.g. system prompts)
@@ -212,4 +218,4 @@ sudo bash set_gpus_limits.sh    # sets all 4 GPUs to 225W
 
 Most LLM serving tools try to be universal — support every model on every hardware. This results in complex configs, hidden defaults, and fragile setups.
 
-This repo does one thing: serve a 27B Qwen model in BF16 on 4x RTX 3090s with 262K context. Every parameter is tuned for this specific combination. If you have different hardware, fork and adjust.
+This repo serves a 27B Qwen model family on 4x RTX 3090s with shared runtime profiles and selectable quantization checkpoints (BF16/Q8/Q6). If you have different hardware, fork and adjust.

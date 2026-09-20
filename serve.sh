@@ -11,8 +11,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/profile-lib.sh"
 VLLM_VENV="${SCRIPT_DIR}/.venv"
-MODEL_PATH="/home/michel/models/qwen3.8-27b-bf16"
 PROFILE_NAME=""
+MODEL_QUANTIZATION="${MODEL_QUANTIZATION:-bf16}"
+
+quantization_model_dirname() {
+  case "$1" in
+    bf16) echo "qwen3.8-27b-bf16" ;;
+    q8) echo "qwen3.8-27b-q8" ;;
+    q6) echo "qwen3.8-27b-q6" ;;
+    *)
+      echo "ERROR: Unsupported quantization: $1 (expected: bf16, q8, q6)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+list_quantizations() {
+  cat <<EOF
+  bf16                 Full-precision BF16 weights
+  q8                   8-bit quantized weights (model/repo dependent)
+  q6                   6-bit quantized weights (model/repo dependent)
+EOF
+}
 
 require_option_arg() {
   local option_name="$1"
@@ -34,16 +54,21 @@ require_non_negative_integer() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) require_option_arg "--profile" "$@"; PROFILE_NAME="$2"; shift 2 ;;
+    --quantization) require_option_arg "--quantization" "$@"; MODEL_QUANTIZATION="$(echo "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
     --list-profiles) list_profiles; exit 0 ;;
+    --list-quantizations) list_quantizations; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+quantization_model_dirname "$MODEL_QUANTIZATION" >/dev/null
 
 if [ -n "$PROFILE_NAME" ]; then
   load_profile "$PROFILE_NAME"
 fi
 
 # ---- configuration (override via env vars or .env file) -----------
+MODEL_PATH="${MODEL_PATH:-${HOME}/models/$(quantization_model_dirname "$MODEL_QUANTIZATION")}"
 PORT="${VLLM_PORT:-8000}"
 HOST="0.0.0.0"
 TENSOR_PARALLEL="${VLLM_TP:-4}"

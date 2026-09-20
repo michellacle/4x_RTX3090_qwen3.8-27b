@@ -64,12 +64,14 @@ list_profiles() {
 write_runtime_env() {
   local env_path="$1"
   local profile_name="$2"
-  local model_path="$3"
-  local port="$4"
-  local tensor_parallel="$5"
-  local gpus="$6"
+  local model_quantization="$3"
+  local model_path="$4"
+  local port="$5"
+  local tensor_parallel="$6"
+  local gpus="$7"
 
   {
+    printf 'MODEL_QUANTIZATION=%q\n' "$model_quantization"
     printf 'MODEL_PATH=%q\n' "$model_path"
     printf 'VLLM_PORT=%q\n' "$port"
     printf 'VLLM_TP=%q\n' "$tensor_parallel"
